@@ -1,0 +1,180 @@
+import { createHash } from "node:crypto";
+import type OpenAI from "openai";
+import { env } from "../config/env.js";
+import { logger } from "../config/logger.js";
+import { AppError } from "../utils/AppError.js";
+import { MCPClient } from "./MCPClient.js";
+import type { MCPServerConfig, MCPToolDefinition, MCPToolExecution } from "./types.js";
+
+type CachedTools = {
+  expiresAt: number;
+  tools: MCPToolDefinition[];
+};
+
+type ToolMapEntry = {
+  openAiName: string;
+  serverId: string;
+  toolName: string;
+};
+
+export class MCPService {
+  private readonly clients = new Map<string, MCPClient>();
+  private readonly toolCache = new Map<string, CachedTools>();
+  private readonly toolMap = new Map<string, ToolMapEntry>();
+
+  constructor(
+    private readonly servers: MCPServerConfig[] = env.QUICKCOMMERCE_API_KEY
+      ? [
+          {
+            id: "quickcommerce",
+            name: "QuickCommerce",
+            url: env.QUICKCOMMERCE_MCP_URL,
+            headers: { "X-API-Key": env.QUICKCOMMERCE_API_KEY },
+            toolCacheTtlMs: env.MCP_TOOL_CACHE_TTL_MS,
+            maxRetries: env.MCP_MAX_RETRIES
+          }
+        ]
+      : []
+  ) {
+    for (const server of servers) {
+      this.clients.set(server.id, new MCPClient(server));
+    }
+  }
+
+  isConfigured() {
+    return this.servers.length > 0;
+  }
+
+  getConfiguredServers() {
+    return this.servers.map((server) => ({
+      id: server.id,
+      name: server.name,
+      url: server.url
+    }));
+  }
+
+  async discoverTools(forceRefresh = false): Promise<MCPToolDefinition[]> {
+    const tools: MCPToolDefinition[] = [];
+
+    for (const server of this.servers) {
+      const cached = this.toolCache.get(server.id);
+      if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+        tools.push(...cached.tools);
+        continue;
+      }
+
+      const client = this.clients.get(server.id);
+      if (!client) throw new AppError(`MCP server not configured: ${server.id}`, 500, "MCP_SERVER_NOT_CONFIGURED");
+
+      const discovered = (await client.listTools()).map((tool) => ({ ...tool, serverId: server.id }));
+      this.toolCache.set(server.id, { tools: discovered, expiresAt: Date.now() + server.toolCacheTtlMs });
+      tools.push(...discovered);
+    }
+
+    this.rebuildToolMap(tools);
+    return tools;
+  }
+
+  async getOpenAITools(): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+    const tools = await this.discoverTools();
+    return tools.map((tool) => {
+      const openAiName = this.toOpenAIToolName(tool.serverId, tool.name);
+      this.toolMap.set(openAiName, { openAiName, serverId: tool.serverId, toolName: tool.name });
+
+      return {
+        type: "function",
+        function: {
+          name: openAiName,
+          description: `[${tool.serverId}] ${tool.description ?? tool.title ?? tool.name}`,
+          parameters: this.publicInputSchema(tool.inputSchema)
+        }
+      };
+    });
+  }
+
+  async executeOpenAITool(openAiName: string, rawArguments: string): Promise<MCPToolExecution> {
+    if (this.toolMap.size === 0) await this.discoverTools();
+
+    const mapped = this.toolMap.get(openAiName);
+    if (!mapped) throw new AppError(`Unknown MCP tool requested: ${openAiName}`, 400, "UNKNOWN_MCP_TOOL");
+
+    const client = this.clients.get(mapped.serverId);
+    if (!client) throw new AppError(`MCP server not configured: ${mapped.serverId}`, 500, "MCP_SERVER_NOT_CONFIGURED");
+
+    const args = this.withServerCredentials(mapped.serverId, this.parseArguments(rawArguments));
+    const startedAt = Date.now();
+    const result = await client.callTool(mapped.toolName, args);
+
+    return {
+      serverId: mapped.serverId,
+      toolName: mapped.toolName,
+      arguments: this.redactArguments(args),
+      result,
+      durationMs: Date.now() - startedAt
+    };
+  }
+
+  private rebuildToolMap(tools: MCPToolDefinition[]) {
+    this.toolMap.clear();
+    for (const tool of tools) {
+      const openAiName = this.toOpenAIToolName(tool.serverId, tool.name);
+      this.toolMap.set(openAiName, { openAiName, serverId: tool.serverId, toolName: tool.name });
+    }
+    logger.info("MCP tool map refreshed", { count: this.toolMap.size });
+  }
+
+  private toOpenAIToolName(serverId: string, toolName: string): string {
+    const safeServer = serverId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeTool = toolName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const hash = createHash("sha256").update(`${serverId}:${toolName}`).digest("hex").slice(0, 8);
+    return `mcp_${safeServer}_${safeTool}_${hash}`.slice(0, 64);
+  }
+
+  private parseArguments(rawArguments: string): Record<string, unknown> {
+    try {
+      const parsed = rawArguments ? JSON.parse(rawArguments) : {};
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+      throw new Error("Tool arguments must be a JSON object");
+    } catch (error) {
+      throw new AppError("Invalid tool arguments generated by model", 400, "INVALID_TOOL_ARGUMENTS", error);
+    }
+  }
+
+  private withServerCredentials(serverId: string, args: Record<string, unknown>) {
+    if (serverId !== "quickcommerce" || !env.QUICKCOMMERCE_API_KEY) return args;
+    return {
+      ...args,
+      api_key: args.api_key ?? env.QUICKCOMMERCE_API_KEY
+    };
+  }
+
+  private redactSecrets(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map((item) => this.redactSecrets(item));
+
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, nestedValue]) => [
+          key,
+          /api[_-]?key|token|secret|password/i.test(key) ? "[redacted]" : this.redactSecrets(nestedValue)
+        ])
+      );
+    }
+
+    return value;
+  }
+
+  private redactArguments(args: Record<string, unknown>) {
+    return this.redactSecrets(args) as Record<string, unknown>;
+  }
+
+  private publicInputSchema(inputSchema: MCPToolDefinition["inputSchema"]) {
+    const properties = { ...(inputSchema.properties ?? {}) };
+    delete properties.api_key;
+
+    return {
+      ...inputSchema,
+      properties,
+      required: inputSchema.required?.filter((field) => field !== "api_key")
+    };
+  }
+}

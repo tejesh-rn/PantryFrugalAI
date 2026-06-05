@@ -1,0 +1,238 @@
+@import "tailwindcss";
+
+/* ============================================
+   PANTRY FRUGAL AI — LIGHT THEME DESIGN SYSTEM
+   ============================================ */
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: 'Outfit', 'Inter', sans-serif;
+
+  --bg-page: #ece8f4;
+  --bg-panel: #ffffff;
+  --bg-input: #f8fafc;
+
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --accent-light: #d1fae5;
+  --accent-soft: #ecfdf5;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  --border: #e2e8f0;
+  --border-hover: #cbd5e1;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.07);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.1);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================
+   TYPOGRAPHY
+   ======================== */
+.font-outfit { font-family: 'Outfit', 'Inter', sans-serif; }
+
+.glow-text {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* ========================
+   FORM ELEMENTS
+   ======================== */
+.glass-input {
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+.glass-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ========================
+   CHAT MESSAGE PROSE
+   ======================== */
+.prose-chat {
+  font-family: 'Lato', sans-serif;
+  font-size: 0.925rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.prose-chat p { margin-bottom: 0.5rem; }
+.prose-chat p:last-child { margin-bottom: 0; }
+.prose-chat ul { list-style-type: disc; margin-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; }
+.prose-chat ol { list-style-type: decimal; margin-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; }
+.prose-chat li { margin-bottom: 0.25rem; }
+.prose-chat strong { color: var(--accent); font-weight: 700; }
+
+/* ========================
+   MESSAGE BUBBLES — GLASSMORPHISM
+   ======================== */
+.chat-gradient-bg {
+  background: linear-gradient(165deg, #e8d5e0 0%, #ddd5e8 35%, #d5dae8 60%, #dce2ea 100%);
+}
+
+.user-bubble {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  border-bottom-right-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.assistant-bubble {
+  background: transparent;
+}
+
+/* ========================
+   NAVIGATION
+   ======================== */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+}
+
+.nav-item:hover { background: #f1f5f9; color: var(--text-primary); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); }
+
+/* ========================
+   HISTORY PANEL
+   ======================== */
+.history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.history-item:hover { background: #f1f5f9; }
+.history-item.active { background: var(--accent-soft); }
+
+/* ========================
+   CATEGORY PILLS
+   ======================== */
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: white;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.category-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ========================
+   TAG BADGES
+   ======================== */
+.tag-badge-diet {
+  background: var(--accent-soft);
+  border: 1px solid #a7f3d0;
+}
+.tag-badge-diet:hover { background: var(--accent-light); border-color: var(--accent); }
+
+.tag-badge-brand {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+.tag-badge-brand:hover { background: #dbeafe; border-color: #3b82f6; }
+
+/* ========================
+   GLASS PANEL (modals)
+   ======================== */
+.glass-panel {
+  background: white;
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+}
+
+/* ========================
+   ANIMATIONS
+   ======================== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-slow { animation: spinSlow 12s infinite linear; }
+
+/* ========================
+   SCROLLBAR
+   ======================== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ========================
+   GLOBAL TRANSITIONS
+   ======================== */
+button, a { transition: all 0.15s ease; }
+
+.progress-bar-fill {
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
